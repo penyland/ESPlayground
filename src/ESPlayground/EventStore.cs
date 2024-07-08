@@ -1,9 +1,12 @@
-﻿namespace ESPlayground;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace ESPlayground;
 
 internal class EventStore<T>
     where T : IEventStoreEntity, new()
 {
-    private readonly Dictionary<Guid, SortedList<DateTime, Event>> eventStore = [];
+    private readonly Dictionary<Guid, SortedList<DateTime, EventEntity>> eventStore = [];
     private readonly Dictionary<Guid, T> eventEntities = [];
 
     public void Append(Event @event)
@@ -14,14 +17,31 @@ internal class EventStore<T>
             eventStore[@event.StreamId] = [];
         }
 
-        eventStore[@event.StreamId].Add(DateTime.UtcNow, @event);
+        var eventWithData = new EventEntity
+        {
+            StreamId = @event.StreamId,
+            CreatedAtUtc = DateTime.UtcNow,
+            Data = @event,
+            Type = @event.GetType()
+        };
+
+        eventStore[@event.StreamId].Add(DateTime.UtcNow, eventWithData);
 
         eventEntities[@event.StreamId] = GetEntity(@event.StreamId)!;
     }
 
     public IList<Event> GetEvents(Guid streamId)
     {
-        return eventStore.GetValueOrDefault(streamId, null).Values ?? [];
+        var entity =  eventStore.GetValueOrDefault(streamId, null).Values ?? [];
+        return entity.Select(e => e.Data).ToList();
+    }
+
+    public string GetEventsAsJson(Guid id)
+    {
+        var values = eventStore!.GetValueOrDefault(id, default);
+
+        var json = JsonSerializer.Serialize(eventStore!.GetValueOrDefault(id, default));
+        return json;
     }
 
     public T? GetView(Guid id)
@@ -31,7 +51,7 @@ internal class EventStore<T>
 
     public T? GetEntity(Guid id)
     {
-        if (!eventStore.TryGetValue(id, out SortedList<DateTime, Event>? value))
+        if (!eventStore.TryGetValue(id, out var value))
         {
             return default;
         }
@@ -39,11 +59,28 @@ internal class EventStore<T>
         var entity = new T();
         foreach (var @event in value.Values)
         {
-            entity.Apply(@event);
+            entity.Apply(@event.Data);
         }
 
         return entity;
     }
 }
 
-internal abstract record Event(Guid StreamId, DateTime CreatedAtUtc);
+internal abstract record Event
+{
+    public required Guid StreamId { get; set; }
+}
+
+internal record EventEntity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public required Guid StreamId { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    [property: JsonIgnore]
+    public Type? Type { get; set; }
+
+    public Event? Data { get; set; }
+}

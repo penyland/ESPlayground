@@ -9,7 +9,7 @@ internal class PullRequest : IEventStoreEntity
     public void Apply(CreatedEvent createdEvent)
     {
         Id = createdEvent.Id;
-        Title = $"Pull request {Id}";
+        Title = $"Pull request {Id} created";
     }
 
     public void Apply(UpdatedEvent updatedEvent)
@@ -40,24 +40,19 @@ internal class PullRequest : IEventStoreEntity
 }
 internal record CreatedEvent : Event
 {
-    public CreatedEvent(int id) : base(Guid.NewGuid(), DateTime.UtcNow)
-    {
-        Id = id;
-    }
-
     public int Id { get; set; }
 }
 
 internal record UpdatedEvent : Event
 {
-    public UpdatedEvent() : base(Guid.NewGuid(), DateTime.UtcNow)
-    {
-    }
+    public int Id { get; set; }
+
+    public string Reason { get; set; }
 }
 
 internal record DeletedEvent : Event
 {
-    public DeletedEvent() : base(Guid.NewGuid(), DateTime.UtcNow)
-    {
-    }
+    public int Id { get; set; }
+
+    public DateTime DeletedAtUtc { get; set; }
 }
